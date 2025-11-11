@@ -1,0 +1,6 @@
+{
+  "env": [
+    { "TURNLOCK": "1" }
+  ],
+  "path": "$HOUDINI_USER_PREF_DIR/python3.10libs"
+}

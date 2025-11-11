@@ -1,0 +1,139 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<pythonPanelDocument>
+  <interface name="Turntable Lock" label="Turntable Lock" icon="BUTTONS_lock">
+    <script><![CDATA[
+try:
+    from PySide6 import QtWidgets, QtCore
+except ImportError:
+    from PySide2 import QtWidgets, QtCore
+
+import hou, math
+
+_WORLD_UP = hou.Vector3(0, 1, 0)
+_ALPHA = 0.75
+_INTERVAL_MS = 80
+
+def _fix_roll_on_active_viewport():
+    sv = hou.ui.paneTabOfType(hou.paneTabType.SceneViewer)
+    if not sv:
+        return
+    vp = sv.curViewport()
+    if not vp:
+        return
+    cam = vp.defaultCamera()
+    if cam is None:
+        return
+
+    R = cam.rotation()
+    right = hou.Vector3(R.at(0,0), R.at(1,0), R.at(2,0))
+    up    = hou.Vector3(R.at(0,1), R.at(1,1), R.at(2,1))
+    fwd   = hou.Vector3(R.at(0,2), R.at(1,2), R.at(2,2)).normalized()
+
+    up_proj    = up - fwd * up.dot(fwd)
+    world_proj = _WORLD_UP - fwd * _WORLD_UP.dot(fwd)
+    if up_proj.length() < 1e-7 or world_proj.length() < 1e-7:
+        return
+
+    up_proj    = up_proj.normalized()
+    world_proj = world_proj.normalized()
+
+    cross = up_proj.cross(world_proj)
+    sin_a = fwd.dot(cross)
+    cos_a = up_proj.dot(world_proj)
+    angle = math.atan2(sin_a, cos_a)
+
+    if abs(angle) < 1e-3:
+        return
+
+    dtheta = angle * max(0.0, min(1.0, _ALPHA))
+    dtheta_deg = math.degrees(dtheta)
+
+    rot4  = hou.hmath.buildRotateAboutAxis(fwd,  dtheta_deg)
+    rot4n = hou.hmath.buildRotateAboutAxis(fwd, -dtheta_deg)
+    rot3  = rot4.extractRotationMatrix3()
+    rot3n = rot4n.extractRotationMatrix3()
+
+    def remaining_roll(Rc):
+        right_c = hou.Vector3(Rc.at(0,0), Rc.at(1,0), Rc.at(2,0))
+        up_c    = hou.Vector3(Rc.at(0,1), Rc.at(1,1), Rc.at(2,1))
+        fwd_c   = hou.Vector3(Rc.at(0,2), Rc.at(1,2), Rc.at(2,2)).normalized()
+        up_proj_c    = up_c - fwd_c * up_c.dot(fwd_c)
+        world_proj_c = _WORLD_UP - fwd_c * _WORLD_UP.dot(fwd_c)
+        if up_proj_c.length() < 1e-8 or world_proj_c.length() < 1e-8:
+            return 9999.0
+        up_proj_c    = up_proj_c.normalized()
+        world_proj_c = world_proj_c.normalized()
+        sin_a = fwd_c.dot(up_proj_c.cross(world_proj_c))
+        cos_a = up_proj_c.dot(world_proj_c)
+        return abs(math.atan2(sin_a, cos_a))
+
+    candidates = [rot3 * R, R * rot3, rot3n * R, R * rot3n]
+    bestR = min(candidates, key=remaining_roll)
+    cam.setRotation(bestR)
+
+class TLWidget(QtWidgets.QWidget):
+    def __init__(self, parent=None):
+        super(TLWidget, self).__init__(parent)
+        lay = QtWidgets.QVBoxLayout(self)
+
+        self.chk = QtWidgets.QCheckBox("Lock Horizon (Turntable Mode)")
+        lay.addWidget(self.chk)
+
+        row1 = QtWidgets.QHBoxLayout()
+        row1.addWidget(QtWidgets.QLabel("Strength"))
+        self.strength = QtWidgets.QSlider(QtCore.Qt.Horizontal)
+        self.strength.setMinimum(1)
+        self.strength.setMaximum(100)
+        self.strength.setValue(int(_ALPHA*100))
+        row1.addWidget(self.strength)
+        lay.addLayout(row1)
+
+        row2 = QtWidgets.QHBoxLayout()
+        row2.addWidget(QtWidgets.QLabel("Interval (ms)"))
+        self.interval = QtWidgets.QSpinBox()
+        self.interval.setMinimum(10)
+        self.interval.setMaximum(250)
+        self.interval.setValue(_INTERVAL_MS)
+        row2.addWidget(self.interval)
+        lay.addLayout(row2)
+
+        self.btnY = QtWidgets.QPushButton("World Up: +Y")
+        self.btnZ = QtWidgets.QPushButton("World Up: +Z")
+        lay.addWidget(self.btnY)
+        lay.addWidget(self.btnZ)
+
+        self.timer = QtCore.QTimer(self)
+        self.timer.setInterval(_INTERVAL_MS)
+        self.timer.timeout.connect(_fix_roll_on_active_viewport)
+
+        self.chk.stateChanged.connect(self._on_toggle)
+        self.strength.valueChanged.connect(self._on_strength)
+        self.interval.valueChanged.connect(self._on_interval)
+        self.btnY.clicked.connect(lambda: self._set_world_up(hou.Vector3(0,1,0)))
+        self.btnZ.clicked.connect(lambda: self._set_world_up(hou.Vector3(0,0,1)))
+
+    def _on_toggle(self, state):
+        if state:
+            self.timer.start()
+        else:
+            self.timer.stop()
+
+    def _on_strength(self, v):
+        global _ALPHA
+        _ALPHA = max(0.01, min(1.0, v/100.0))
+
+    def _on_interval(self, v):
+        self.timer.setInterval(int(v))
+
+    def _set_world_up(self, v):
+        global _WORLD_UP
+        _WORLD_UP = v
+
+def createInterface():
+    return TLWidget()
+
+def onCreateInterface():
+    return TLWidget()
+    ]]></script>
+  </interface>
+</pythonPanelDocument>

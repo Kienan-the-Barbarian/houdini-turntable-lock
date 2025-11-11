@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<shelfDocument>
+  <tool name="turntable_lock_toggle" label="Lock Horizon" icon="BUTTONS_lock">
+    <toolMenuContext name="viewer"/>
+    <script scriptType="python"><![CDATA[
+import hou
+hou.ui.displayMessage("Open the 'Turntable Lock' Python Panel (Windows > New Floating Panel > + > Python Panel > Turntable Lock) to control settings.")
+    ]]></script>
+  </tool>
+</shelfDocument>
