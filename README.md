@@ -1,7 +1,7 @@
 # Houdini Turntable Lock
 
 A lightweight Python Panel for Houdini 21+ that keeps the viewport horizon level while tumbling. 
-Intended for use with a SpaceMouse. Works somewhat with regular mouse navigation, but is slightly nauseating.
+Ideal for use with a SpaceMouse, but great with regular mouse navigation, too. Works best with standard Houdini tumbling method enabled.
 
 ## Features
 - Lock the horizon to world +Y or +Z
